@@ -1,0 +1,137 @@
+فایل زیپ را در روت باز کنید و قبل از باز کردن نام پوشه خود را در themes اصلاخ کنید.
+
+
+////////////////////
+
+کد زیر را در برگه sql در phpmyadmin اجرا کنید
+
+
+ALTER TABLE `users` ADD `mobile_sms` VARCHAR( 255 ) NOT NULL AFTER `is_network_admin` ,
+ADD `mobile_actived` TINYINT( 1 ) NOT NULL DEFAULT '0' AFTER `mobile_sms` ,
+ADD `mobile_active_code` INT( 10 ) NOT NULL AFTER `mobile_actived` ,
+ADD `mobile_active_time` VARCHAR( 255 ) NOT NULL AFTER `mobile_active_code`
+
+
+
+
+//////////////////////////
+
+به فایل زیر رجوع کنید
+system/helpers/func_main.php
+
+حال در این فایل در آخر کد های زیر را اضافه گنید
+/////////////////////////////////////////////////////////////
+
+
+function encode_mobile_num($num=null){
+global $C;
+	
+return base64_encode(mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($C->MOBILE_KEY_GENERATOR), $num, MCRYPT_MODE_CBC, md5(md5($C->MOBILE_KEY_GENERATOR))));
+
+	
+	}
+		
+	
+function decode_mobile_num($num=null){
+global $C;
+	
+
+return rtrim(mcrypt_decrypt(MCRYPT_RIJNDAEL_256, md5($C->MOBILE_KEY_GENERATOR), base64_decode($num), MCRYPT_MODE_CBC, md5(md5($C->MOBILE_KEY_GENERATOR))), "\0");
+	
+	
+	}
+function valid_mobile_num($num=null){
+
+	
+
+return !(substr(trim($num),0,1) <> 0 || strlen($num) <> 11)   ;
+	
+	
+	}	
+function SEND_SMS($num=null,$message=""){
+
+if(!valid_mobile_num($num)){
+return false;
+}
+if(!trim($message)){
+return false;
+}
+	require_once('lib/nusoap.php');
+	
+
+
+	$client =  new nusoap_client('http://www.novinpayamak.com/services/SMSBox/wsdl', 'wsdl'); 
+	$client->soap_defencoding = 'UTF-8';
+
+		$res = $client->call('Send', array(
+			array(
+					'Auth' 	=> array('number' => '3000632XXXXX', 'pass' => 'YOUR_PASS'),
+					'Recipients'=> array('string' => array($num)),
+					'Message' 	=> array('string' => array((string)$message)),
+					'Flash' 	=> false
+				)
+		));
+		
+if($res['Status'] == 1000){
+return true ;
+}
+return false;
+}	
+	
+////////////////////////////////////////////////////////////
+
+
+فایل زیر را باز کنید
+
+system/classess/class_page.php
+
+کد زیر را بیابید:
+
+////////////////////////
+
+require_once( $this->controllers.implode('_',$this->request).'.php' );
+
+//////////////////////
+
+در بالای کد بالا باید کد زیر را قرار بدید
+
+////////////////////////////////////////
+
+if($user->is_logged){
+if($this->request[0] !== "mobile-active" && !$this->user->info->mobile_actived && $this->request[0] !== "signout" ){
+$this->redirect('mobile-active');
+
+exit;
+}
+
+
+} 
+///////////////////////////////////////////
+
+
+
+فایل زیر را بای کنید
+
+system/conf_system.php
+
+کد زیر را بیابید:
+
+/////////////////////
+
+$C->IMG_URL		= $C->SITE_URL.'i/';
+
+////////////////////////////
+
+
+در بالای کد بالا باید کد زیر را اضافه کنید
+
+///////////////////////////////////
+$C->MOBILE_KEY_GENERATOR = "jhjDGS6478JJDN848&^$*JjD8u8#&&UjhDnmk8873778hHEDHNhehayqayYTYGYGtt";
+////////////////////////////////////
+
+
+
+
+کد بالا یک کلید هش میباشد که شما میتوانید برای خود تغییر دهید ولی پس از تغییر دیگر نباید تغییر دهید زیرا شماره های موبایل
+
+طبق این کلید کد شده و در دیتابیس ذخیره میشود تا بدون این کلید کسی نتواند شماره را بازیابی کند
